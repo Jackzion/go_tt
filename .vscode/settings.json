@@ -1,0 +1,20 @@
+{
+    // Go 扩展设置
+    "go.useLanguageServer": true,
+    "go.lintTool": "staticcheck",
+    "editor.formatOnSave": true,
+    "[go]": {
+        "editor.defaultFormatter": "golang.go",
+        "editor.snippetSuggestions": "none",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    "[go.mod]": {
+        "editor.defaultFormatter": "golang.go"
+    },
+    "gopls": {
+        "ui.semanticTokens": true,
+        "ui.completion.usePlaceholders": true
+    }
+}
