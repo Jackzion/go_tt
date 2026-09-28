@@ -13,6 +13,18 @@ import (
 	"gopl.io/ch5/links"
 )
 
+// crawlDone 用于广播取消信号
+var crawlDone = make(chan struct{})
+
+func crawlCancelled() bool {
+	select {
+	case <-crawlDone:
+		return true
+	default:
+		return false
+	}
+}
+
 // 限制 crawl 并发数 ， 只允许同时对 20 条链接进行访问
 var tokens = make(chan struct{}, 20)
 
@@ -173,14 +185,26 @@ func rewriteLinks(content []byte, baseURL *url.URL, mirrorDir string) []byte {
 }
 
 func savePage(rawURL, onlyDomain, mirrorDir string) {
+	if crawlCancelled() {
+		return
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return
 	}
 
-	// 1. 下载页面
-	resp, err := http.Get(rawURL)
+	// 1. 用 http.NewRequest 创建请求，支持取消
+	req, err := http.NewRequest("GET", rawURL, nil)
 	if err != nil {
+		log.Print(err)
+		return
+	}
+	req.Cancel = crawlDone
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		if crawlCancelled() {
+			return
+		}
 		log.Print(err)
 		return
 	}
@@ -213,4 +237,103 @@ func savePage(rawURL, onlyDomain, mirrorDir string) {
 		return
 	}
 	fmt.Printf("Saved: %s → %s\n", rawURL, filePath)
+}
+
+// TestCrawlCancel 支持取消的并发爬虫（练习 8.10）
+func TestCrawlCancel() {
+	const maxDepth = 3
+
+	type Link struct {
+		URL   string
+		Depth int
+	}
+
+	// 监听取消：按回车触发
+	go func() {
+		os.Stdin.Read(make([]byte, 1))
+		fmt.Println("收到取消信号，正在停止...")
+		close(crawlDone)
+	}()
+
+	// 起始 URL
+	startURL := "https://gopl.io/"
+	if len(os.Args) > 1 {
+		startURL = os.Args[1]
+	}
+
+	worklist := make(chan []Link)
+	unseenLinks := make(chan Link)
+
+	go func() {
+		worklist <- []Link{{URL: startURL, Depth: 0}}
+	}()
+
+	// 20 个爬虫 goroutine
+	for i := 0; i < 20; i++ {
+		go func() {
+			for link := range unseenLinks {
+				if crawlCancelled() {
+					return
+				}
+				// 用 http.NewRequest 发请求，支持取消
+				req, err := http.NewRequest("GET", link.URL, nil)
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				req.Cancel = crawlDone
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					if crawlCancelled() {
+						return
+					}
+					log.Print(err)
+					continue
+				}
+				resp.Body.Close()
+
+				// 提取链接
+				fmt.Println(link.URL)
+				foundLinks, err := links.Extract(link.URL)
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				var newLinks []Link
+				for _, l := range foundLinks {
+					if !crawlCancelled() {
+						newLinks = append(newLinks, Link{URL: l, Depth: link.Depth + 1})
+					}
+				}
+				go func() { worklist <- newLinks }()
+			}
+		}()
+	}
+
+	// main 去重 + 深度限制
+	seen := make(map[string]bool)
+	var n int
+	n++
+loop:
+	for list := range worklist {
+		n--
+		for _, link := range list {
+			if crawlCancelled() {
+				break loop
+			}
+			if link.Depth > maxDepth {
+				continue
+			}
+			if !seen[link.URL] {
+				seen[link.URL] = true
+				n++
+				unseenLinks <- link
+			}
+		}
+		if n == 0 {
+			break loop
+		}
+	}
+	close(unseenLinks)
+	fmt.Printf("完成！共爬取 %d 个页面\n", len(seen))
 }

@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	ch8.TestDu3()
+	ch8.TestCrawlCancel()
 }
