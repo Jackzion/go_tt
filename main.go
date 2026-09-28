@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	ch8.TestDu2()
+	ch8.TestDu3()
 }
