@@ -1,9 +1,7 @@
 package main
 
-import (
-	"go_tt/ch8"
-)
+import "go_tt/ch8"
 
 func main() {
-	ch8.TestNetcat1()
+	ch8.TestChat()
 }

@@ -15,15 +15,15 @@ func TestNetcat1() {
 	defer conn.Close()
 	done := make(chan struct{})
 	go func() {
-		io.Copy(os.Stdout, conn)
+		io.Copy(os.Stdout, conn) // 服务器关闭后，这里会返回
 		log.Println("done")
-		done <- struct{}{}
+		done <- struct{}{} // 通知主线程
 	}()
-	mustCopy(conn, os.Stdin)
-	// 只关闭写的部分 ， 保留读的部分
+	mustCopy(conn, os.Stdin) // 读键盘输入，写到服务器
+
 	tcpCon := conn.(*net.TCPConn)
-	tcpCon.CloseWrite()
-	<-done
+	tcpCon.CloseWrite() // 关闭写端
+	<-done              // 等 goroutine 读完
 }
 
 func mustCopy(dst io.Writer, src io.Reader) {
