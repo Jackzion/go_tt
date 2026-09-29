@@ -337,3 +337,60 @@ loop:
 	close(unseenLinks)
 	fmt.Printf("完成！共爬取 %d 个页面\n", len(seen))
 }
+
+// TestMirroredFetch 并发请求多个 URL，第一个返回后取消其余请求（8.4.4 mirroredQuery 变种）
+func TestMirroredFetch(urls ...string) string {
+	if len(urls) == 0 {
+		return ""
+	}
+
+	// 每个请求用独立的 cancel channel
+	cancel := make(chan struct{})
+	type result struct {
+		url  string
+		body string
+		err  error
+	}
+	ch := make(chan result)
+
+	// 为每个 URL 启动一个 goroutine 发送请求
+	for _, url := range urls {
+		go func(url string) {
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				ch <- result{url: url, err: err}
+				return
+			}
+			req.Cancel = cancel // 绑定取消 channel
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				ch <- result{url: url, err: err}
+				return
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				ch <- result{url: url, err: err}
+				return
+			}
+			ch <- result{url: url, body: string(body)}
+		}(url)
+	}
+
+	// 取第一个返回的结果，然后取消其余请求
+	first := <-ch
+	close(cancel) // 广播取消：其余请求立刻中断
+	// 排空其余 goroutine（避免它们永远阻塞在 ch <- 上）
+	for i := 1; i < len(urls); i++ {
+		<-ch
+	}
+
+	if first.err != nil {
+		fmt.Printf("fetch 失败: %s, error: %v\n", first.url, first.err)
+		return ""
+	}
+	fmt.Printf("最快的响应来自: %s, 长度: %d bytes\n", first.url, len(first.body))
+	return first.body
+}
