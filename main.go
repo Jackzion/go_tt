@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	ch8.TestCrawlCancel()
+	ch8.TestNetcat1()
 }
