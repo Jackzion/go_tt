@@ -1,7 +1,6 @@
 package gee
 
 import (
-	"log"
 	"net/http"
 	"strings"
 )
@@ -23,7 +22,6 @@ func newRouter() *router {
 }
 
 func (r *router) addRoute(method, path string, handle HandlerFunc) {
-	log.Printf("Route %4s - %s", method, path)
 	key := method + "-" + path
 	r.handlers[key] = handle
 	// 初始化 METHOD的前缀树
