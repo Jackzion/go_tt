@@ -68,9 +68,11 @@ func (r *router) getRoute(method, path string) (*node, map[string]string) {
 }
 
 func (r *router) handle(c *Context) {
-	// ① 静态快路径：整条路径精确注册过，不用爬树
+	// ① 静态快路径：整条路径精确注册过，不用爬树。
+	//    注意：同样必须 append 进链再 Next —— 否则中间件对静态路由全部失效！
 	if handler, ok := r.handlers[c.Method+"-"+c.Path]; ok {
-		handler(c)
+		c.handlers = append(c.handlers, handler)
+		c.Next()
 		return
 	}
 
@@ -79,9 +81,11 @@ func (r *router) handle(c *Context) {
 	if n != nil {
 		c.Params = params
 		key := c.Method + "-" + n.pattern // 用模式（而非请求路径）反查 handler
-		r.handlers[key](c)
-		return
+		c.handlers = append(c.handlers, r.handlers[key])
+	} else {
+		c.handlers = append(c.handlers, func(c *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		})
 	}
-
-	c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+	c.Next()
 }

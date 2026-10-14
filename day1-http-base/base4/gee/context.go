@@ -20,6 +20,9 @@ type Context struct {
 	Method     string
 	StatusCode int
 	Params     map[string]string // 动态路由参数，如 :name → "geektutu"
+	// 中间件
+	handlers []HandlerFunc
+	index    int
 }
 
 // Param 读取动态路由参数：/hello/:name 匹配 /hello/geektutu 时，c.Param("name") == "geektutu"
@@ -69,12 +72,28 @@ func (c *Context) JSON(code int, obj any) {
 	}
 }
 
+func (c *Context) Next() {
+	c.index++
+	for ; c.index < len(c.handlers); c.index++ {
+		c.handlers[c.index](c)
+	}
+}
+
+// Fail 紧急叫停：跳过链上剩余的所有中间件和 handler，直接写错误响应。
+// 注意：外层正在等待收尾的中间件（如写在 c.Next() 之后的 Logger）仍会执行——
+// 这正是洋葱模型的价值：错误也能被外层统一记录。
+func (c *Context) Fail(code int, msg string) {
+	c.index = len(c.handlers) // 游标拨到链尾，Next 循环直接结束
+	c.String(code, msg)
+}
+
 func NewContext(w http.ResponseWriter, req *http.Request) *Context {
 	return &Context{
 		Writer: w,
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index:  -1,
 	}
 }
 

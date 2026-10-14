@@ -5,6 +5,7 @@ package gee
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 // HandlerFunc 是本框架的处理函数类型（签名已换成 Context）。
@@ -44,6 +45,11 @@ func (group *RouterGroup) Group(prefix string) *RouterGroup {
 	return newGroup
 }
 
+// Use 注册中间件。
+func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
+	group.middlewares = append(group.middlewares, middlewares...)
+}
+
 // 与 router 有关的方法交由 Engine 处理，这里只保留 handle 方法
 func (group *RouterGroup) addRoute(method, path string, handle HandlerFunc) {
 	path = group.prefix + path
@@ -63,7 +69,14 @@ func (group *RouterGroup) POST(pattern string, handler HandlerFunc) {
 // ServeHTTP —— 框架心脏。
 // 每个请求进来，先造一个 Context（百宝箱），查表后交给 handler。
 func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
 	c := NewContext(w, req)
+	c.handlers = middlewares
 	engine.router.handle(c)
 }
 
