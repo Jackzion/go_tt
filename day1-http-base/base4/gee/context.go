@@ -23,6 +23,8 @@ type Context struct {
 	// 中间件
 	handlers []HandlerFunc
 	index    int
+	// engine 指针：Context 需要访问 Engine 里预加载的 HTML 模板集
+	engine *Engine
 }
 
 // Param 读取动态路由参数：/hello/:name 匹配 /hello/geektutu 时，c.Param("name") == "geektutu"
@@ -103,9 +105,16 @@ func (c *Context) Data(code int, data []byte) {
 	c.Writer.Write(data)
 }
 
-// HTML 发送 text/html 响应。
-func (c *Context) HTML(code int, html string) {
+// HTML 按【模板名】渲染 HTML 响应（day6 起签名升级为三参数）：
+//
+//	c.HTML(200, "css.tmpl", nil)              → 从模板集里找 "css.tmpl" 执行
+//	c.HTML(200, "arr.tmpl", gee.H{...})       → 带数据渲染
+//
+// 渲染失败不静默：直接 Fail 500，外层中间件（Logger）还能记录到。
+func (c *Context) HTML(code int, name string, data any) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
-	c.Writer.Write([]byte(html))
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
+		c.Fail(500, err.Error())
+	}
 }
