@@ -25,7 +25,9 @@ func FormatAsDate(t time.Time) string {
 
 func main() {
 	r := gee.New()
-	r.Use(gee.Logger())
+	// 注意注册顺序：Logger 在外，Recovery 在内——
+	// panic 被 Recovery 接住后 Fail 500，返回途中 Logger 照常记录 [500]。
+	r.Use(gee.Logger(), gee.Recovery())
 	// 注意顺序：先装插件（自定义函数），再加载引用了插件的模板
 	r.SetFuncMap(template.FuncMap{
 		"FormatAsDate": FormatAsDate,
@@ -50,6 +52,13 @@ func main() {
 			"title": "gee",
 			"now":   time.Date(2019, 8, 17, 0, 0, 0, 0, time.UTC),
 		})
+	})
+
+	// 故意的事故现场：names[100] 数组越界 → panic
+	// 预期：Recovery 接住 → 返回 500 Internal Server Error，进程存活，其他路由照常
+	r.GET("/panic", func(c *gee.Context) {
+		names := []string{"geektutu"}
+		c.String(http.StatusOK, names[100]) // index out of range → panic!
 	})
 
 	r.Run(":9999")
