@@ -18,6 +18,7 @@ package geecache
 
 import (
 	"errors"
+	pb "go_tt/geecache/geecachepb"
 	"go_tt/geecache/singleflight"
 	"log"
 	"sync"
@@ -93,11 +94,17 @@ func (g *Group) load(key string) (value ByteView, err error) {
 
 // getFromPeer 通过 PeerGetter 从远程节点获取数据，并包装为 ByteView。
 func (g *Group) getFromPeer(peer PeerGetter, key string) (value ByteView, err error) {
-	bytes, err := peer.Get(g.name, key)
+	// 使用 protobuf 定义的 Request 和 Response 结构体
+	req := &pb.Request{
+		Group: g.name,
+		Key:   key,
+	}
+	resp := &pb.Response{}
+	err = peer.Get(req, resp)
 	if err != nil {
 		return ByteView{}, err
 	}
-	return ByteView{bytes}, nil
+	return ByteView{resp.Value}, nil
 }
 
 var (

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package geecachepb;
+
+// go_package 指定生成的 Go 代码的包导入路径（新版 protoc-gen-go 必填，且必须含 "." 或 "/"）
+option go_package = "go_tt/geecache/geecachepb";
+
+message Request {
+  string group = 1;
+  string key = 2;
+}
+
+message Response {
+  bytes value = 1;
+}
+
+service GroupCache {
+  rpc Get(Request) returns (Response);
+}

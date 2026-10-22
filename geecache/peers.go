@@ -1,5 +1,7 @@
 package geecache
 
+import pb "go_tt/geecache/geecachepb"
+
 // 本文件定义了节点间交互的两个核心接口：
 //   - PeerPicker 负责"选节点"：根据 key 算出数据归属哪个节点
 //   - PeerGetter 负责"从节点取数据"：向具体节点发起请求并读取结果
@@ -28,5 +30,6 @@ type PeerPicker interface {
 type PeerGetter interface {
 	// Get 从指定分组（group）中读取指定 key 的值。
 	// group 用于区分多个缓存分组，避免跨分组取错数据。
-	Get(group string, key string) ([]byte, error)
+	// 因为分布式节点都共用同一套代码，因此使用 proto 序列化会变得非常轻松，因为大家都能拿到密本 pb
+	Get(in *pb.Request, out *pb.Response) error
 }
