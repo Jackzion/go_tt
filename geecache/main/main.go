@@ -20,6 +20,7 @@ import (
 	"go_tt/geecache"
 	"log"
 	"net/http"
+	"time"
 )
 
 // db 模拟一个慢速数据库（如 MySQL），作为缓存未命中时的"数据源"。
@@ -38,6 +39,10 @@ func createGroup() *geecache.Group {
 		// 数据源：缓存未命中时调用，这里模拟查数据库（带日志，方便观察回源行为）
 		func(key string) ([]byte, error) {
 			log.Println("[SlowDB] search key", key)
+			// 【演示用】模拟慢速数据库：拉长回源耗时，扩大并发窗口，
+			// 确保并发请求同时在飞，便于观察 singleflight 的合并效果。
+			// 演示完毕后可删除此行，不影响正常逻辑。
+			time.Sleep(2 * time.Second)
 			if v, ok := db[key]; ok {
 				return []byte(v), nil
 			}

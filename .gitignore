@@ -1,3 +1,8 @@
 # 编译产物
 *.exe
 *.test
+
+# run.ps1 测试产物
+node*.log
+curl*.out
+curl*.err
